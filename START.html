@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>SNAKELLY</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+
+    #texto-central, #container-botao {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      opacity: 0;
+      transition: opacity 1s ease;
+      text-align: center;
+    }
+
+    #texto-central {
+      top: 20%;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    #container-botao {
+      top: 75%;
+      pointer-events: none;
+    }
+
+    #texto {
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    #botao-entrar {
+      background-color: #25D366;
+      color: white;
+      font-size: 16px;
+      padding: 10px 24px;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+    }
+
+    #botao-entrar:hover {
+      background-color: #1225d4;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="texto-central">SNAKELLY</div>
+  <div id="container-botao">
+    <div id="texto">Vamos começar!</div>
+    <button id="botao-entrar">Entrar</button>
+  </div>
+
+  <!-- VERIFICAÇÃO DO ARQUIVO -->
+  <script>
+    fetch("../oque-fazer.txt")
+      .then(res => {
+        if (!res.ok) throw new Error("Arquivo não encontrado");
+        return res.text();
+      })
+      .then(texto => {
+        if (!texto.includes("Created by Arthur Rodrigues ---- :-) *")) {
+          document.body.innerHTML = "<h1 style='color: white; text-align: center; margin-top: 20%;'>Acesso negado</h1>";
+          throw new Error("Texto inválido");
+        } else {
+          iniciarSite(); // se tudo certo, executa o resto do site
+        }
+      })
+      .catch(err => {
+        console.error("Erro:", err);
+        document.body.innerHTML = "<h1 style='color: white; text-align: center; margin-top: 20%;'>Erro ao carregar</h1>";
+      });
+
+    // TUDO DENTRO DESSA FUNÇÃO VAI RODAR SÓ SE O ARQUIVO FOR VÁLIDO
+    function iniciarSite() {
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const centro = { x: canvas.width / 2, y: canvas.height / 2 };
+
+      const textoCentral = document.getElementById("texto-central");
+      const containerBotao = document.getElementById("container-botao");
+      const botaoEntrar = document.getElementById("botao-entrar");
+
+      botaoEntrar.onclick = () => {
+        document.body.style.opacity = 0;
+        setTimeout(() => {
+          location.href = "index1.html";
+        }, 1000);
+      };
+
+      const texto = "SNAKELLY";
+      const particulas = [];
+      const densidade = 6;
+      let estado = "texto";
+      let pulsos = 0;
+      let frame = 0;
+      let imgCrescendo = 0;
+
+      const offCanvas = document.createElement("canvas");
+      const offCtx = offCanvas.getContext("2d");
+      offCanvas.width = canvas.width;
+      offCanvas.height = canvas.height;
+
+      offCtx.fillStyle = "white";
+      offCtx.font = "bold 100px sans-serif";
+      offCtx.textAlign = "center";
+      offCtx.textBaseline = "middle";
+      offCtx.fillText(texto, offCanvas.width / 2, offCanvas.height / 2);
+
+      const dados = offCtx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+      for (let y = 0; y < canvas.height; y += densidade) {
+        for (let x = 0; x < canvas.width; x += densidade) {
+          const i = (y * canvas.width + x) * 4;
+          if (dados[i + 3] > 128) {
+            particulas.push({
+              x: Math.random() * canvas.width,
+              y: Math.random() * canvas.height,
+              cor: "lime",
+              tx: x,
+              ty: y
+            });
+          }
+        }
+      }
+
+      const img = new Image();
+      img.src = "hills.png";
+
+      function desenhar() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (const p of particulas) {
+          if (estado === "texto") {
+            const scale = 1 + Math.sin(frame / 10) * 0.05;
+            p.x += (p.tx * scale - p.x) * 0.1;
+            p.y += (p.ty * scale - p.y) * 0.1;
+          } else if (estado === "puxando") {
+            p.x += (centro.x - p.x) * 0.05;
+            p.y += (centro.y - p.y) * 0.05;
+          }
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+          ctx.fillStyle = p.cor;
+          ctx.fill();
+        }
+
+        if (estado === "texto") {
+          if (frame % 60 === 0) pulsos++;
+          if (pulsos >= 3) estado = "puxando";
+        }
+
+        if (estado === "puxando" && particulas.every(p =>
+          Math.hypot(p.x - centro.x, p.y - centro.y) < 10)) {
+          estado = "imagem";
+        }
+
+        if (estado === "imagem") {
+          if (imgCrescendo < 1) imgCrescendo += 0.01;
+
+          const pulse = Math.sin(frame / 10) * 0.03;
+          const finalScale = imgCrescendo + pulse;
+          const w = 300 * finalScale;
+          const h = 300 * finalScale;
+
+          ctx.save();
+          ctx.globalAlpha = 1;
+          ctx.drawImage(img, centro.x - w / 2, centro.y - h / 2, w, h);
+          ctx.restore();
+
+          if (imgCrescendo >= 1) {
+            textoCentral.style.opacity = 1;
+            containerBotao.style.opacity = 1;
+            containerBotao.style.pointerEvents = 'auto';
+          }
+        }
+
+        frame++;
+        requestAnimationFrame(desenhar);
+      }
+
+      desenhar();
+    }
+  </script>
+</body>
+</html>
